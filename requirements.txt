@@ -1,3 +1,4 @@
+# model
 joblib==1.2.0
 numpy==1.23.4
 pandas==1.5.0
@@ -8,3 +9,7 @@ scipy==1.9.2
 six==1.16.0
 sklearn==0.0
 threadpoolctl==3.1.0
+
+# API
+fastapi==0.104.1
+uvicorn==0.24.0
