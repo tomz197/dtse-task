@@ -7,12 +7,34 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 
+def setup_mock_housing_model():
+    """Helper function to create a mock housing model"""
+    from unittest.mock import MagicMock
+    import src.config as config
+    
+    if config.housing_model is None:
+        model = MagicMock()
+        model.expected_features = [
+            "longitude", "latitude", "housing_median_age", "total_rooms",
+            "total_bedrooms", "population", "households", "median_income",
+            "ocean_proximity_<1H OCEAN", "ocean_proximity_INLAND",
+            "ocean_proximity_ISLAND", "ocean_proximity_NEAR BAY",
+            "ocean_proximity_NEAR OCEAN",
+        ]
+        def mock_predict(df):
+            return df["median_income"].values * 100000
+        model.predict = mock_predict
+        config.housing_model = model
+
+
 def update_db_manager_and_rate_limiter(db_manager):
-    """Helper function to update main.db_manager and RateLimiter's db_manager"""
+    """Helper function to update main.db_manager, config.db_manager and RateLimiter's db_manager"""
     import main
+    import src.config as config
     from src.rate_limit import RateLimiter
 
     main.db_manager = db_manager
+    config.db_manager = db_manager
     # Update RateLimiter's db_manager if it exists, or create new instance
     if RateLimiter._instance is not None:
         RateLimiter._instance._db_manager = db_manager
@@ -45,6 +67,7 @@ class TestPredictEndpoints:
         """Test /predict endpoint with valid token"""
         db_manager, _, token = db_manager_with_token
         update_db_manager_and_rate_limiter(db_manager)
+        setup_mock_housing_model()
 
         sample_input = {
             "longitude": -122.64,
@@ -88,6 +111,7 @@ class TestPredictEndpoints:
         """Test /predict/batch endpoint with valid token"""
         db_manager, _, token = db_manager_with_token
         update_db_manager_and_rate_limiter(db_manager)
+        setup_mock_housing_model()
 
         sample_inputs = [
             {
@@ -130,6 +154,7 @@ class TestPredictEndpoints:
         """Test /predict/batch endpoint with empty list"""
         db_manager, _, token = db_manager_with_token
         update_db_manager_and_rate_limiter(db_manager)
+        setup_mock_housing_model()
 
         response = app_client.post(
             "/predict/batch", json=[], headers={"Authorization": f"Bearer {token}"}
@@ -147,10 +172,13 @@ class TestTokenEndpoints:
     def test_create_token_no_expiration(self, app_client, temp_db):
         """Test creating a token without expiration"""
         import main
+        import src.config as config
 
-        main.db_manager, _ = temp_db  # Update db_manager for this test
+        db_manager, _ = temp_db  # Update db_manager for this test
+        main.db_manager = db_manager
+        config.db_manager = db_manager
 
-        response = app_client.post("/create-token", json={})
+        response = app_client.post("/create-token", json={"username": "test", "password": "test"})
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -161,12 +189,15 @@ class TestTokenEndpoints:
     def test_create_token_with_expiration(self, app_client, temp_db):
         """Test creating a token with expiration"""
         import main
+        import src.config as config
 
-        main.db_manager, _ = temp_db
+        db_manager, _ = temp_db
+        main.db_manager = db_manager
+        config.db_manager = db_manager
 
         expires_at = (datetime.now() + timedelta(days=7)).isoformat()
 
-        response = app_client.post("/create-token", json={"expires_at": expires_at})
+        response = app_client.post("/create-token", json={"username": "test", "password": "test", "expires_at": expires_at})
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -176,25 +207,31 @@ class TestTokenEndpoints:
     def test_create_token_invalid_expiration_format(self, app_client, temp_db):
         """Test creating a token with invalid expiration format"""
         import main
+        import src.config as config
 
-        main.db_manager, _ = temp_db
+        db_manager, _ = temp_db
+        main.db_manager = db_manager
+        config.db_manager = db_manager
 
-        response = app_client.post("/create-token", json={"expires_at": "invalid-date"})
+        response = app_client.post("/create-token", json={"username": "test", "password": "test", "expires_at": "invalid-date"})
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_revoke_token(self, app_client, temp_db):
         """Test revoking a token"""
         import main
+        import src.config as config
 
-        main.db_manager, _ = temp_db
+        db_manager, _ = temp_db
+        main.db_manager = db_manager
+        config.db_manager = db_manager
 
         # Create a token first
-        create_response = app_client.post("/create-token", json={})
+        create_response = app_client.post("/create-token", json={"username": "test", "password": "test"})
         token = create_response.json()["token"]
 
         # Revoke the token
-        response = app_client.post("/revoke-token", json={"token": token})
+        response = app_client.post("/revoke-token", json={"username": "test", "password": "test", "token": token})
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -204,27 +241,33 @@ class TestTokenEndpoints:
     def test_revoke_nonexistent_token(self, app_client, temp_db):
         """Test revoking a token that doesn't exist"""
         import main
+        import src.config as config
 
-        main.db_manager, _ = temp_db
+        db_manager, _ = temp_db
+        main.db_manager = db_manager
+        config.db_manager = db_manager
 
-        response = app_client.post("/revoke-token", json={"token": "nonexistent_token"})
+        response = app_client.post("/revoke-token", json={"username": "test", "password": "test", "token": "nonexistent_token"})
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_get_tokens(self, app_client, temp_db):
         """Test getting all active tokens"""
         import main
+        import src.config as config
 
-        main.db_manager, _ = temp_db
+        db_manager, _ = temp_db
+        main.db_manager = db_manager
+        config.db_manager = db_manager
 
         # Create a few tokens
         tokens = []
         for _ in range(3):
-            create_response = app_client.post("/create-token", json={})
+            create_response = app_client.post("/create-token", json={"username": "test", "password": "test"})
             tokens.append(create_response.json()["token"])
 
         # Get all tokens
-        response = app_client.post("/get-tokens")
+        response = app_client.post("/get-tokens", json={"username": "test", "password": "test"})
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
@@ -234,19 +277,22 @@ class TestTokenEndpoints:
     def test_get_tokens_excludes_revoked(self, app_client, temp_db):
         """Test that revoked tokens are not returned"""
         import main
+        import src.config as config
 
-        main.db_manager, _ = temp_db
+        db_manager, _ = temp_db
+        main.db_manager = db_manager
+        config.db_manager = db_manager
 
         # Create and revoke a token
-        create_response = app_client.post("/create-token", json={})
+        create_response = app_client.post("/create-token", json={"username": "test", "password": "test"})
         token = create_response.json()["token"]
-        app_client.post("/revoke-token", json={"token": token})
+        app_client.post("/revoke-token", json={"username": "test", "password": "test", "token": token})
 
         # Create another active token
-        app_client.post("/create-token", json={})
+        app_client.post("/create-token", json={"username": "test", "password": "test"})
 
         # Get all tokens - should only return active one
-        response = app_client.post("/get-tokens")
+        response = app_client.post("/get-tokens", json={"username": "test", "password": "test"})
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data["tokens"]) == 1
@@ -261,6 +307,7 @@ class TestRateLimiting:
 
         db_manager, _, token = db_manager_with_token
         update_db_manager_and_rate_limiter(db_manager)
+        setup_mock_housing_model()
 
         # Reset rate limiter for testing with lower limit
         RateLimiter._instance = None
@@ -364,6 +411,7 @@ class TestRequestLogging:
         """Test that requests are logged"""
         db_manager, _, token = db_manager_with_token
         update_db_manager_and_rate_limiter(db_manager)
+        setup_mock_housing_model()
 
         sample_input = {
             "longitude": -122.64,

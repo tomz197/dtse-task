@@ -103,15 +103,27 @@ def rate_limiter(temp_db):
 
 
 @pytest.fixture
-def app_client(mock_housing_model, temp_db):
+def app_client(mock_housing_model, temp_db, monkeypatch):
     """Create a test client for the FastAPI app"""
     import main
     from main import app
+    import src.config as config
 
     # Set up test fixtures
     db_manager, _ = temp_db
+    # Update config module (used by endpoints) instead of main module
+    config.housing_model = mock_housing_model
+    config.db_manager = db_manager
+    # Also update main module for compatibility
     main.housing_model = mock_housing_model
     main.db_manager = db_manager
+
+    # Mock verify_admin_credentials to bypass authentication in tests
+    def mock_verify_admin_credentials(username, password):
+        return username
+    
+    monkeypatch.setattr("src.auth.verify_admin_credentials", mock_verify_admin_credentials)
+    monkeypatch.setattr("src.endpoints.tokens.verify_admin_credentials", mock_verify_admin_credentials)
 
     # Initialize rate limiter with test db_manager
     from src.rate_limit import RateLimiter

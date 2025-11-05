@@ -78,14 +78,18 @@ class TestTokenSchemas:
 
     def test_create_token_request_no_expiration(self):
         """Test CreateTokenRequest without expiration"""
-        request = CreateTokenRequest()
+        request = CreateTokenRequest(username="test", password="test")
         assert request.expires_at is None
+        assert request.username == "test"
+        assert request.password == "test"
 
     def test_create_token_request_with_expiration(self):
         """Test CreateTokenRequest with expiration"""
         expires_at = "2024-12-31T23:59:59"
-        request = CreateTokenRequest(expires_at=expires_at)
+        request = CreateTokenRequest(username="test", password="test", expires_at=expires_at)
         assert request.expires_at == expires_at
+        assert request.username == "test"
+        assert request.password == "test"
 
     def test_create_token_response(self):
         """Test CreateTokenResponse"""
@@ -97,8 +101,10 @@ class TestTokenSchemas:
     def test_revoke_token_request(self):
         """Test RevokeTokenRequest"""
         token = "test_token_12345"
-        request = RevokeTokenRequest(token=token)
+        request = RevokeTokenRequest(username="test", password="test", token=token)
         assert request.token == token
+        assert request.username == "test"
+        assert request.password == "test"
 
     def test_revoke_token_response(self):
         """Test RevokeTokenResponse"""
