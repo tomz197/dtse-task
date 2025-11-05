@@ -5,16 +5,21 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
+from dotenv import load_dotenv
 
+from fastapi import Depends, FastAPI, HTTPException, Request, status
+
+from src.auth import verify_admin_credentials
 from src.database import DatabaseManager
 from src.logging_config import get_logger, setup_logging
 from src.model import MODEL_NAME, HousingModel
 from src.rate_limit import RateLimiter
 from src.schemas import (CreateTokenRequest, CreateTokenResponse, HousingInput,
                          PredictionResponse, RevokeTokenRequest,
-                         RevokeTokenResponse, TokensResponse,
+                         RevokeTokenResponse, TokensResponse, GetTokensRequest,
                          prepare_input_data)
+
+load_dotenv()
 
 log_level = os.getenv("LOG_LEVEL", "INFO")
 log_file = os.getenv("LOG_FILE", "logs/app.log")
@@ -26,9 +31,7 @@ setup_logging(
 )
 logger = get_logger(__name__)
 
-DB_PATH = os.getenv("DB_PATH", "data/housing.db") or os.path.join(
-    os.path.dirname(os.path.dirname(__file__)), "data", "housing.db"
-)
+DB_PATH = os.getenv("DB_PATH", "data/housing.db")
 
 housing_model = None
 db_manager = None
@@ -195,6 +198,7 @@ def predict_housing_price_batch(
 
 @app.post("/create-token", response_model=CreateTokenResponse)
 def create_token(request: CreateTokenRequest):
+    verify_admin_credentials(request.username, request.password)
     logger.info("Creating new API token")
     expires_at = None
     try:
@@ -222,6 +226,7 @@ def create_token(request: CreateTokenRequest):
 
 @app.post("/revoke-token", response_model=RevokeTokenResponse)
 def revoke_token(request: RevokeTokenRequest):
+    verify_admin_credentials(request.username, request.password)
     logger.info(f"Revoking API token: {request.token[:8]}...")
     if not db_manager.deactivate_api_token(request.token):
         logger.warning(f"Token not found for revocation: {request.token[:8]}...")
@@ -233,7 +238,8 @@ def revoke_token(request: RevokeTokenRequest):
 
 
 @app.post("/get-tokens")
-def get_tokens():
+def get_tokens(request: GetTokensRequest):
+    verify_admin_credentials(request.username, request.password)
     logger.info("Retrieving all active API tokens")
     try:
         tokens = db_manager.get_api_tokens()

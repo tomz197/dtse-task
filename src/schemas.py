@@ -21,6 +21,8 @@ class PredictionResponse(BaseModel):
 
 
 class CreateTokenRequest(BaseModel):
+    username: str
+    password: str
     expires_at: Optional[str] = None
 
 
@@ -30,6 +32,8 @@ class CreateTokenResponse(BaseModel):
 
 
 class RevokeTokenRequest(BaseModel):
+    username: str
+    password: str
     token: str
 
 
@@ -40,6 +44,11 @@ class RevokeTokenResponse(BaseModel):
 class TokenResponse(BaseModel):
     token: str
     expires_at: Optional[str] = None
+
+
+class GetTokensRequest(BaseModel):
+    username: str
+    password: str
 
 
 class TokensResponse(BaseModel):
