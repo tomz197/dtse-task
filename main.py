@@ -105,6 +105,37 @@ async def log_requests(request: Request, call_next):
         raise
 
 
+@app.get("/health")
+def health_check():
+    """Health check endpoint for monitoring and container health checks."""
+    try:
+        # Check if model and database are initialized
+        if housing_model is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Model not initialized"
+            )
+        if db_manager is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database not initialized"
+            )
+        return {
+            "status": "healthy",
+            "service": "dtse-api",
+            "model_loaded": True,
+            "database_initialized": True
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Health check failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service unhealthy"
+        )
+
+
 @app.post("/predict", response_model=PredictionResponse)
 def predict_housing_price(
     input_data: HousingInput,
