@@ -129,6 +129,10 @@ def predict_housing_price_batch(
 ):
     logger.info(f"Predicting housing prices for batch of {len(input_data)} inputs (token: {token[:8]}...)")
     try:
+        if not input_data:
+            logger.info("Empty batch request, returning empty list")
+            return []
+        
         data_dicts = [item.model_dump() for item in input_data]
         df = prepare_input_data(data_dicts, housing_model.expected_features)
         predictions = housing_model.predict(df)
