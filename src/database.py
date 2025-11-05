@@ -1,0 +1,99 @@
+import sqlite3
+import os
+import threading
+from typing import Optional
+from datetime import datetime
+
+DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'housing.db')
+
+class DatabaseManager:
+    _instance = None
+    _local = threading.local()
+    
+    def __new__(cls, db_path: Optional[str] = None):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+    
+    def __init__(self, db_path: Optional[str] = None):
+        if not self._initialized:
+            self.db_path = db_path or DB_PATH
+            self._initialized = True
+    
+    def __del__(self):
+        self.close_connection()
+        DatabaseManager._instance = None
+    
+    def close_connection(self):
+        if hasattr(self._local, 'connection') and self._local.connection:
+            self._local.connection.close()
+            self._local.connection = None
+    
+    def get_connection(self) -> sqlite3.Connection:
+        """Get a thread-local connection"""
+        if not hasattr(self._local, 'connection') or self._local.connection is None:
+            self._local.connection = sqlite3.connect(self.db_path)
+            self._local.connection.row_factory = sqlite3.Row
+            # Initialize schema on first connection (idempotent operation)
+            self._init_schema()
+        return self._local.connection
+    
+    @property
+    def _connection(self) -> sqlite3.Connection:
+        """Property to access thread-local connection"""
+        return self.get_connection()
+    
+    def _init_schema(self):
+        cursor = self._connection.cursor()
+        
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS api_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                token TEXT UNIQUE NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                expires_at TIMESTAMP,
+                is_active BOOLEAN DEFAULT 1
+            )
+        """)
+        
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_api_tokens_token ON api_tokens(token)")
+        
+        self._connection.commit()
+    
+    def create_api_token(self, token: str, expires_at: Optional[datetime] = None):
+        cursor = self._connection.cursor()
+        try:
+            cursor.execute("INSERT INTO api_tokens (token, expires_at) VALUES (?, ?)", (token, expires_at))
+            self._connection.commit()
+            return cursor.lastrowid
+        except Exception:
+            self._connection.rollback()
+            raise
+    
+    def get_api_tokens(self) -> list[dict]:
+        cursor = self._connection.cursor()
+        cursor.execute("SELECT * FROM api_tokens WHERE is_active = 1")
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+    
+    def deactivate_api_token(self, token: str) -> bool:
+        cursor = self._connection.cursor()
+        try:
+            cursor.execute("UPDATE api_tokens SET is_active = 0 WHERE token = ?", (token,))
+            self._connection.commit()
+            return cursor.rowcount > 0
+        except Exception:
+            self._connection.rollback()
+            raise
+    
+    def validate_api_token(self, token: str) -> bool:
+        """Check if token exists and is active"""
+        cursor = self._connection.cursor()
+        cursor.execute("""
+            SELECT id FROM api_tokens 
+            WHERE token = ? AND is_active = 1 
+            AND (expires_at IS NULL OR expires_at > datetime('now'))
+        """, (token,))
+        result = cursor.fetchone()
+        return result is not None

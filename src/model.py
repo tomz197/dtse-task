@@ -69,34 +69,3 @@ class HousingModel:
 
     def save(self, filename=None):
         save_model(self.model, filename or self.model_path)
-
-if __name__ == '__main__':
-    logging.info('Preparing the data...')
-    X_train, X_test, y_train, y_test = prepare_data(TRAIN_DATA)
-
-    # the model was already trained before
-    # logging.info('Training the model...')
-    # regr = train(TRAIN_DATA)
-
-    # the model was already saved before into file 'model.joblib'
-    # logging.info('Exporting the model...')
-    # save_model(regr, MODEL_NAME)
-
-    logging.info('Loading the model...')
-    housing_model = HousingModel(MODEL_NAME)
-
-    logging.info('Calculating train dataset predictions...')
-    y_pred_train = housing_model.predict(X_train)
-    logging.info('Calculating test dataset predictions...')
-    y_pred_test = housing_model.predict(X_test)
-
-    # evaluate model
-    logging.info('Evaluating the model...')
-    train_error = mean_absolute_error(y_train, y_pred_train)
-    test_error = mean_absolute_error(y_test, y_pred_test)
-
-    logging.info('First 5 predictions:')
-    logging.info(f'\n{X_test.head()}')
-    logging.info(y_pred_test[:5])
-    logging.info(f'Train error: {train_error}')
-    logging.info(f'Test error: {test_error}')

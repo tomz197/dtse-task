@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import Optional, List, Dict
 import pandas as pd
 
 class HousingInput(BaseModel):
@@ -14,6 +15,26 @@ class HousingInput(BaseModel):
 
 class PredictionResponse(BaseModel):
     median_house_value: float
+
+class CreateTokenRequest(BaseModel):
+    expires_at: Optional[str] = None
+
+class CreateTokenResponse(BaseModel):
+    token: str
+    expires_at: Optional[str] = None
+
+class RevokeTokenRequest(BaseModel):
+    token: str
+
+class RevokeTokenResponse(BaseModel):
+    message: str
+
+class TokenResponse(BaseModel):
+    token: str
+    expires_at: Optional[str] = None
+
+class TokensResponse(BaseModel):
+    tokens: List[Dict]
 
 def prepare_input_data(data_dicts, expected_features):
     df = pd.DataFrame(data_dicts)
