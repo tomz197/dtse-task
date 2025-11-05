@@ -55,11 +55,11 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
 class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
     """Middleware to limit the size of incoming requests."""
-    
+
     def __init__(self, app, max_request_size_mb: int = 10):
         super().__init__(app)
         self.max_request_size = max_request_size_mb * 1024 * 1024
-    
+
     async def dispatch(self, request: Request, call_next):
         if request.headers.get("content-length"):
             content_length = int(request.headers.get("content-length", 0))
@@ -70,8 +70,7 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
                 )
                 raise HTTPException(
                     status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                    detail=f"Request too large. Maximum size: {self.max_request_size / 1024 / 1024}MB"
+                    detail=f"Request too large. Maximum size: {self.max_request_size / 1024 / 1024}MB",
                 )
         response = await call_next(request)
         return response
-

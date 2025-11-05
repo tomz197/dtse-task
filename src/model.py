@@ -1,7 +1,6 @@
 import joblib
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import train_test_split
 
 from src.logging_config import get_logger
@@ -27,9 +26,7 @@ def prepare_data(input_data_path):
     df_features = df.drop(["median_house_value"], axis=1)
     y = df["median_house_value"].values
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        df_features, y, test_size=0.2, random_state=RANDOM_STATE
-    )
+    X_train, X_test, y_train, y_test = train_test_split(df_features, y, test_size=0.2, random_state=RANDOM_STATE)
     logger.info(f"Split data: Train={len(X_train)}, Test={len(X_test)}")
 
     return (X_train, X_test, y_train, y_test)
@@ -38,9 +35,7 @@ def prepare_data(input_data_path):
 def train(X_train, y_train):
     logger.info(f"Training RandomForestRegressor on {len(X_train)} samples")
     # what columns are expected by the model
-    logger.debug(
-        f"Model expects {len(X_train.columns)} features: {list(X_train.columns)}"
-    )
+    logger.debug(f"Model expects {len(X_train.columns)} features: {list(X_train.columns)}")
 
     regr = RandomForestRegressor(max_depth=12)
     regr.fit(X_train, y_train)
@@ -76,9 +71,7 @@ class HousingModel:
         logger.info(f"Initializing HousingModel with model: {model_path}")
         self.model = load_model(model_path)
         self._load_expected_features()
-        logger.info(
-            f"HousingModel initialized with {len(self.expected_features)} expected features"
-        )
+        logger.info(f"HousingModel initialized with {len(self.expected_features)} expected features")
 
     def _load_expected_features(self):
         logger.debug(f"Loading expected features from {TRAIN_DATA}")

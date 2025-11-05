@@ -1,28 +1,34 @@
-import time
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-import pytest
 from fastapi import status
-from fastapi.testclient import TestClient
 
 
 def setup_mock_housing_model():
     """Helper function to create a mock housing model"""
-    from unittest.mock import MagicMock
     import src.config as config
-    
+
     if config.housing_model is None:
         model = MagicMock()
         model.expected_features = [
-            "longitude", "latitude", "housing_median_age", "total_rooms",
-            "total_bedrooms", "population", "households", "median_income",
-            "ocean_proximity_<1H OCEAN", "ocean_proximity_INLAND",
-            "ocean_proximity_ISLAND", "ocean_proximity_NEAR BAY",
+            "longitude",
+            "latitude",
+            "housing_median_age",
+            "total_rooms",
+            "total_bedrooms",
+            "population",
+            "households",
+            "median_income",
+            "ocean_proximity_<1H OCEAN",
+            "ocean_proximity_INLAND",
+            "ocean_proximity_ISLAND",
+            "ocean_proximity_NEAR BAY",
             "ocean_proximity_NEAR OCEAN",
         ]
+
         def mock_predict(df):
             return df["median_income"].values * 100000
+
         model.predict = mock_predict
         config.housing_model = model
 
@@ -61,7 +67,12 @@ class TestPredictEndpoints:
         }
 
         response = app_client.post("/predict", json=sample_input)
-        assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert response.status_code in [
+            status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_403_FORBIDDEN,
+        ]
+        error_data = response.json()
+        assert error_data["status"] == "fail"
 
     def test_predict_single_with_token(self, app_client, db_manager_with_token):
         """Test /predict endpoint with valid token"""
@@ -81,14 +92,14 @@ class TestPredictEndpoints:
             "ocean_proximity": "NEAR OCEAN",
         }
 
-        response = app_client.post(
-            "/predict", json=sample_input, headers={"Authorization": f"Bearer {token}"}
-        )
+        response = app_client.post("/predict", json=sample_input, headers={"Authorization": f"Bearer {token}"})
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert "median_house_value" in data
-        assert isinstance(data["median_house_value"], float)
+        assert data["status"] == "success"
+        assert "data" in data
+        assert "median_house_value" in data["data"]
+        assert isinstance(data["data"]["median_house_value"], float)
 
     def test_predict_single_invalid_input(self, app_client, db_manager_with_token):
         """Test /predict endpoint with invalid input"""
@@ -101,11 +112,12 @@ class TestPredictEndpoints:
             # Missing other required fields
         }
 
-        response = app_client.post(
-            "/predict", json=invalid_input, headers={"Authorization": f"Bearer {token}"}
-        )
+        response = app_client.post("/predict", json=invalid_input, headers={"Authorization": f"Bearer {token}"})
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        error_data = response.json()
+        assert error_data["status"] == "fail"
+        assert "data" in error_data
 
     def test_predict_batch_with_token(self, app_client, db_manager_with_token):
         """Test /predict/batch endpoint with valid token"""
@@ -146,9 +158,12 @@ class TestPredictEndpoints:
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert isinstance(data, list)
-        assert len(data) == 2
-        assert all("median_house_value" in item for item in data)
+        assert data["status"] == "success"
+        assert "data" in data
+        assert "predictions" in data["data"]
+        assert isinstance(data["data"]["predictions"], list)
+        assert len(data["data"]["predictions"]) == 2
+        assert all("median_house_value" in item for item in data["data"]["predictions"])
 
     def test_predict_batch_empty_list(self, app_client, db_manager_with_token):
         """Test /predict/batch endpoint with empty list"""
@@ -156,14 +171,15 @@ class TestPredictEndpoints:
         update_db_manager_and_rate_limiter(db_manager)
         setup_mock_housing_model()
 
-        response = app_client.post(
-            "/predict/batch", json=[], headers={"Authorization": f"Bearer {token}"}
-        )
+        response = app_client.post("/predict/batch", json=[], headers={"Authorization": f"Bearer {token}"})
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert isinstance(data, list)
-        assert len(data) == 0
+        assert data["status"] == "success"
+        assert "data" in data
+        assert "predictions" in data["data"]
+        assert isinstance(data["data"]["predictions"], list)
+        assert len(data["data"]["predictions"]) == 0
 
 
 class TestTokenEndpoints:
@@ -182,9 +198,11 @@ class TestTokenEndpoints:
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert "token" in data
-        assert data["expires_at"] is None
-        assert len(data["token"]) > 0
+        assert data["status"] == "success"
+        assert "data" in data
+        assert "token" in data["data"]
+        assert data["data"]["expires_at"] is None
+        assert len(data["data"]["token"]) > 0
 
     def test_create_token_with_expiration(self, app_client, temp_db):
         """Test creating a token with expiration"""
@@ -197,12 +215,17 @@ class TestTokenEndpoints:
 
         expires_at = (datetime.now() + timedelta(days=7)).isoformat()
 
-        response = app_client.post("/create-token", json={"username": "test", "password": "test", "expires_at": expires_at})
+        response = app_client.post(
+            "/create-token",
+            json={"username": "test", "password": "test", "expires_at": expires_at},
+        )
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert "token" in data
-        assert data["expires_at"] == expires_at
+        assert data["status"] == "success"
+        assert "data" in data
+        assert "token" in data["data"]
+        assert data["data"]["expires_at"] == expires_at
 
     def test_create_token_invalid_expiration_format(self, app_client, temp_db):
         """Test creating a token with invalid expiration format"""
@@ -213,9 +236,15 @@ class TestTokenEndpoints:
         main.db_manager = db_manager
         config.db_manager = db_manager
 
-        response = app_client.post("/create-token", json={"username": "test", "password": "test", "expires_at": "invalid-date"})
+        response = app_client.post(
+            "/create-token",
+            json={"username": "test", "password": "test", "expires_at": "invalid-date"},
+        )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
+        error_data = response.json()
+        assert error_data["status"] == "fail"
+        assert "data" in error_data
 
     def test_revoke_token(self, app_client, temp_db):
         """Test revoking a token"""
@@ -228,15 +257,20 @@ class TestTokenEndpoints:
 
         # Create a token first
         create_response = app_client.post("/create-token", json={"username": "test", "password": "test"})
-        token = create_response.json()["token"]
+        token = create_response.json()["data"]["token"]
 
         # Revoke the token
-        response = app_client.post("/revoke-token", json={"username": "test", "password": "test", "token": token})
+        response = app_client.post(
+            "/revoke-token",
+            json={"username": "test", "password": "test", "token": token},
+        )
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert "message" in data
-        assert "revoked" in data["message"].lower()
+        assert data["status"] == "success"
+        assert "data" in data
+        assert "message" in data["data"]
+        assert "revoked" in data["data"]["message"].lower()
 
     def test_revoke_nonexistent_token(self, app_client, temp_db):
         """Test revoking a token that doesn't exist"""
@@ -247,9 +281,15 @@ class TestTokenEndpoints:
         main.db_manager = db_manager
         config.db_manager = db_manager
 
-        response = app_client.post("/revoke-token", json={"username": "test", "password": "test", "token": "nonexistent_token"})
+        response = app_client.post(
+            "/revoke-token",
+            json={"username": "test", "password": "test", "token": "nonexistent_token"},
+        )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
+        error_data = response.json()
+        assert error_data["status"] == "fail"
+        assert "data" in error_data
 
     def test_get_tokens(self, app_client, temp_db):
         """Test getting all active tokens"""
@@ -264,15 +304,17 @@ class TestTokenEndpoints:
         tokens = []
         for _ in range(3):
             create_response = app_client.post("/create-token", json={"username": "test", "password": "test"})
-            tokens.append(create_response.json()["token"])
+            tokens.append(create_response.json()["data"]["token"])
 
         # Get all tokens
         response = app_client.post("/get-tokens", json={"username": "test", "password": "test"})
 
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert "tokens" in data
-        assert len(data["tokens"]) == 3
+        assert data["status"] == "success"
+        assert "data" in data
+        assert "tokens" in data["data"]
+        assert len(data["data"]["tokens"]) == 3
 
     def test_get_tokens_excludes_revoked(self, app_client, temp_db):
         """Test that revoked tokens are not returned"""
@@ -285,8 +327,11 @@ class TestTokenEndpoints:
 
         # Create and revoke a token
         create_response = app_client.post("/create-token", json={"username": "test", "password": "test"})
-        token = create_response.json()["token"]
-        app_client.post("/revoke-token", json={"username": "test", "password": "test", "token": token})
+        token = create_response.json()["data"]["token"]
+        app_client.post(
+            "/revoke-token",
+            json={"username": "test", "password": "test", "token": token},
+        )
 
         # Create another active token
         app_client.post("/create-token", json={"username": "test", "password": "test"})
@@ -295,7 +340,9 @@ class TestTokenEndpoints:
         response = app_client.post("/get-tokens", json={"username": "test", "password": "test"})
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert len(data["tokens"]) == 1
+        assert data["status"] == "success"
+        assert "data" in data
+        assert len(data["data"]["tokens"]) == 1
 
 
 class TestRateLimiting:
@@ -336,17 +383,16 @@ class TestRateLimiting:
             assert response.status_code == status.HTTP_200_OK
 
         # Next request should be rate limited
-        response = app_client.post(
-            "/predict", json=sample_input, headers={"Authorization": f"Bearer {token}"}
-        )
+        response = app_client.post("/predict", json=sample_input, headers={"Authorization": f"Bearer {token}"})
 
         assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
-        assert "Rate limit exceeded" in response.json()["detail"]
+        error_data = response.json()
+        assert error_data["status"] == "fail"
+        assert "data" in error_data
+        assert "Rate limit exceeded" in error_data["data"]["message"]
 
     def test_invalid_token(self, app_client, temp_db):
         """Test that invalid tokens are rejected"""
-        import main
-
         db_manager, _ = temp_db
         update_db_manager_and_rate_limiter(db_manager)
 
@@ -369,12 +415,13 @@ class TestRateLimiting:
         )
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        error_data = response.json()
+        assert error_data["status"] == "fail"
+        assert "data" in error_data
 
     def test_expired_token(self, app_client, temp_db):
         """Test that expired tokens are rejected"""
         from datetime import datetime, timedelta
-
-        import main
 
         db_manager, _ = temp_db
         update_db_manager_and_rate_limiter(db_manager)
@@ -402,6 +449,9 @@ class TestRateLimiting:
         )
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        error_data = response.json()
+        assert error_data["status"] == "fail"
+        assert "data" in error_data
 
 
 class TestRequestLogging:
@@ -425,9 +475,7 @@ class TestRequestLogging:
             "ocean_proximity": "NEAR OCEAN",
         }
 
-        response = app_client.post(
-            "/predict", json=sample_input, headers={"Authorization": f"Bearer {token}"}
-        )
+        response = app_client.post("/predict", json=sample_input, headers={"Authorization": f"Bearer {token}"})
 
         # If we get here without errors, logging middleware is working
         assert response.status_code == status.HTTP_200_OK

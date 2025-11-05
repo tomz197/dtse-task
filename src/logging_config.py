@@ -94,9 +94,7 @@ def setup_logging(
         root_logger.addHandler(console_handler)
 
     if enable_file_logging and log_file:
-        file_handler = RotatingFileHandler(
-            log_file, maxBytes=10 * 1024 * 1024, backupCount=5  # 10MB
-        )
+        file_handler = RotatingFileHandler(log_file, maxBytes=10 * 1024 * 1024, backupCount=5)  # 10MB
         file_handler.setLevel(numeric_level)
         file_handler.setFormatter(JSONFormatter())
         root_logger.addHandler(file_handler)

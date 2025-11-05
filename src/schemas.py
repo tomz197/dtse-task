@@ -15,10 +15,10 @@ class HousingInput(BaseModel):
     median_income: float = Field(..., ge=0, description="Median income in the area")
     ocean_proximity: str = Field(..., description="Distance from the ocean")
 
-    @field_validator('ocean_proximity')
+    @field_validator("ocean_proximity")
     @classmethod
     def validate_ocean_proximity(cls, v: str) -> str:
-        allowed_values = ['<1H OCEAN', 'INLAND', 'ISLAND', 'NEAR BAY', 'NEAR OCEAN']
+        allowed_values = ["<1H OCEAN", "INLAND", "ISLAND", "NEAR BAY", "NEAR OCEAN"]
         if v not in allowed_values:
             raise ValueError(f"ocean_proximity must be one of {allowed_values}, got '{v}'")
         return v

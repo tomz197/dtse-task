@@ -53,8 +53,6 @@ def mock_housing_model(monkeypatch):
     """Mock the HousingModel for testing"""
     from unittest.mock import MagicMock
 
-    import pandas as pd
-
     model = MagicMock()
     model.expected_features = [
         "longitude",
@@ -95,9 +93,7 @@ def rate_limiter(temp_db):
     db_manager, _ = temp_db
     # Reset singleton instance
     RateLimiter._instance = None
-    rate_limiter = RateLimiter(
-        requests_per_minute=10, window_seconds=60, db_manager=db_manager
-    )
+    rate_limiter = RateLimiter(requests_per_minute=10, window_seconds=60, db_manager=db_manager)
     yield rate_limiter
     RateLimiter._instance = None
 
@@ -106,8 +102,8 @@ def rate_limiter(temp_db):
 def app_client(mock_housing_model, temp_db, monkeypatch):
     """Create a test client for the FastAPI app"""
     import main
-    from main import app
     import src.config as config
+    from main import app
 
     # Set up test fixtures
     db_manager, _ = temp_db
@@ -121,7 +117,7 @@ def app_client(mock_housing_model, temp_db, monkeypatch):
     # Mock verify_admin_credentials to bypass authentication in tests
     def mock_verify_admin_credentials(username, password):
         return username
-    
+
     monkeypatch.setattr("src.auth.verify_admin_credentials", mock_verify_admin_credentials)
     monkeypatch.setattr("src.endpoints.tokens.verify_admin_credentials", mock_verify_admin_credentials)
 

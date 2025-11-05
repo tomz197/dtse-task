@@ -2,10 +2,16 @@ import pandas as pd
 import pytest
 from pydantic import ValidationError
 
-from src.schemas import (CreateTokenRequest, CreateTokenResponse, HousingInput,
-                         PredictionResponse, RevokeTokenRequest,
-                         RevokeTokenResponse, TokensResponse,
-                         prepare_input_data)
+from src.schemas import (
+    CreateTokenRequest,
+    CreateTokenResponse,
+    HousingInput,
+    PredictionResponse,
+    RevokeTokenRequest,
+    RevokeTokenResponse,
+    TokensResponse,
+    prepare_input_data,
+)
 
 
 class TestHousingInput:

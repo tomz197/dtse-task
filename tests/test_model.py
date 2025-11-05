@@ -1,11 +1,9 @@
-import os
 from unittest.mock import MagicMock, mock_open, patch
 
-import joblib
 import pandas as pd
 import pytest
 
-from src.model import MODEL_NAME, TRAIN_DATA, HousingModel
+from src.model import MODEL_NAME, HousingModel
 
 
 class TestHousingModel:

@@ -4,8 +4,6 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from src.database import DatabaseManager
-
 
 class TestDatabaseManager:
     """Tests for DatabaseManager class"""
@@ -20,9 +18,7 @@ class TestDatabaseManager:
 
         # Check that schema is created
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='api_tokens'"
-        )
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='api_tokens'")
         result = cursor.fetchone()
         assert result is not None
 

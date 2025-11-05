@@ -1,6 +1,7 @@
 import os
-from fastapi import HTTPException, status
+
 from dotenv import load_dotenv
+from fastapi import HTTPException, status
 
 from src.logging_config import get_logger
 

@@ -6,4 +6,3 @@ from src.model import HousingModel
 
 housing_model: Optional[HousingModel] = None
 db_manager: Optional[DatabaseManager] = None
-

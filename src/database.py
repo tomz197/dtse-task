@@ -68,9 +68,7 @@ class DatabaseManager:
         """
         )
 
-        cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_api_tokens_token ON api_tokens(token)"
-        )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_api_tokens_token ON api_tokens(token)")
 
         self._connection.commit()
         logger.debug("Database schema initialized")
@@ -104,15 +102,13 @@ class DatabaseManager:
         cursor = self._connection.cursor()
         try:
             logger.debug(f"Deactivating API token: {token[:8]}...")
-            cursor.execute(
-                "UPDATE api_tokens SET is_active = 0 WHERE token = ?", (token,)
-            )
+            cursor.execute("UPDATE api_tokens SET is_active = 0 WHERE token = ?", (token,))
             self._connection.commit()
             success = cursor.rowcount > 0
             if success:
-                logger.debug(f"Token deactivated successfully")
+                logger.debug("Token deactivated successfully")
             else:
-                logger.warning(f"Token not found for deactivation")
+                logger.warning("Token not found for deactivation")
             return success
         except Exception as e:
             logger.error(f"Error deactivating API token: {e}", exc_info=True)
@@ -125,8 +121,8 @@ class DatabaseManager:
         logger.debug(f"Validating API token: {token[:8]}...")
         cursor.execute(
             """
-            SELECT id FROM api_tokens 
-            WHERE token = ? AND is_active = 1 
+            SELECT id FROM api_tokens
+            WHERE token = ? AND is_active = 1
             AND (expires_at IS NULL OR expires_at > datetime('now'))
         """,
             (token,),

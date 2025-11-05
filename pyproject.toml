@@ -1,0 +1,26 @@
+[tool.black]
+line-length = 127
+target-version = ['py38', 'py39', 'py310', 'py311']
+exclude = '''
+/(
+    \.venv
+  | venv
+  | __pycache__
+  | \.pytest_cache
+  | \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.nox
+  | dist
+  | build
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 127
+skip_gitignore = true
+skip_glob = [".venv/*", "venv/*", "__pycache__/*", "*.egg-info/*"]
+

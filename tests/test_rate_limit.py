@@ -3,9 +3,6 @@ import time
 import pytest
 from fastapi import HTTPException
 
-from src.database import DatabaseManager
-from src.rate_limit import RateLimiter
-
 
 class TestRateLimiter:
     """Tests for RateLimiter class"""
@@ -126,18 +123,14 @@ class TestRateLimiter:
         db_manager, _ = temp_db
         rate_limiter._db_manager = db_manager
 
-        credentials = HTTPAuthorizationCredentials(
-            scheme="Bearer", credentials="invalid_token"
-        )
+        credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="invalid_token")
 
         with pytest.raises(HTTPException) as exc_info:
             rate_limiter.check_rate_limit_dependency(credentials)
 
         assert exc_info.value.status_code == 401
 
-    def test_check_rate_limit_dependency_valid_token(
-        self, rate_limiter, db_manager_with_token
-    ):
+    def test_check_rate_limit_dependency_valid_token(self, rate_limiter, db_manager_with_token):
         """Test dependency function with valid token"""
         from fastapi.security import HTTPAuthorizationCredentials
 
@@ -150,9 +143,7 @@ class TestRateLimiter:
         result = rate_limiter.check_rate_limit_dependency(credentials)
         assert result == token
 
-    def test_check_rate_limit_dependency_rate_limit_exceeded(
-        self, rate_limiter, db_manager_with_token
-    ):
+    def test_check_rate_limit_dependency_rate_limit_exceeded(self, rate_limiter, db_manager_with_token):
         """Test dependency function when rate limit is exceeded"""
         from fastapi.security import HTTPAuthorizationCredentials
 

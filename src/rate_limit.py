@@ -42,9 +42,7 @@ class RateLimiter:
 
             # Dictionary: token -> list of request timestamps
             self.token_requests: Dict[str, list] = defaultdict(list)
-            logger.info(
-                f"RateLimiter initialized: {requests_per_minute} requests per {window_seconds} seconds"
-            )
+            logger.info(f"RateLimiter initialized: {requests_per_minute} requests per {window_seconds} seconds")
             self._initialized = True
         else:
             # Allow updating db_manager and limits even after initialization
@@ -60,9 +58,7 @@ class RateLimiter:
         current_time = time.time()
         cutoff_time = current_time - self.window_seconds
 
-        self.token_requests[token] = [
-            ts for ts in self.token_requests[token] if ts > cutoff_time
-        ]
+        self.token_requests[token] = [ts for ts in self.token_requests[token] if ts > cutoff_time]
 
     def check_rate_limit(self, token: str) -> Tuple[bool, int, int]:
         """
@@ -71,9 +67,7 @@ class RateLimiter:
         """
         if not token:
             logger.warning("Rate limit check called without token")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail="Token is required"
-            )
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token is required")
 
         self._cleanup_old_requests(token)
 
@@ -91,16 +85,12 @@ class RateLimiter:
 
         self.token_requests[token].append(time.time())
 
-        oldest_request = (
-            self.token_requests[token][0] if self.token_requests[token] else time.time()
-        )
+        oldest_request = self.token_requests[token][0] if self.token_requests[token] else time.time()
         remaining_time = self.window_seconds - (time.time() - oldest_request)
         remaining_time = max(0, int(remaining_time))
 
         remaining = self.requests_per_minute - current_count - 1
-        logger.debug(
-            f"Rate limit check passed for token {token[:8]}...: {remaining} requests remaining"
-        )
+        logger.debug(f"Rate limit check passed for token {token[:8]}...: {remaining} requests remaining")
 
         return True, remaining, remaining_time
 
@@ -108,9 +98,7 @@ class RateLimiter:
         logger.info(f"Resetting rate limit for token {token[:8]}...")
         self.token_requests[token] = []
 
-    def check_rate_limit_dependency(
-        self, credentials: HTTPAuthorizationCredentials = Security(HTTPBearer())
-    ) -> str:
+    def check_rate_limit_dependency(self, credentials: HTTPAuthorizationCredentials = Security(HTTPBearer())) -> str:
         token = credentials.credentials
 
         # Get the singleton instance
@@ -132,7 +120,10 @@ class RateLimiter:
             )
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Rate limit exceeded. Limit: {instance.requests_per_minute} requests per minute. Retry after {remaining_time} seconds.",
+                detail=(
+                    f"Rate limit exceeded. Limit: {instance.requests_per_minute} "
+                    f"requests per minute. Retry after {remaining_time} seconds."
+                ),
                 headers={
                     "X-RateLimit-Limit": str(instance.requests_per_minute),
                     "X-RateLimit-Remaining": str(remaining_tokens),
