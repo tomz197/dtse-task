@@ -1,13 +1,15 @@
-import pytest
-import tempfile
 import os
 import shutil
+import sys
+import tempfile
 from pathlib import Path
+
+import pytest
 from fastapi.testclient import TestClient
+
 from src.database import DatabaseManager
 from src.model import HousingModel
 from src.rate_limit import RateLimiter
-import sys
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -18,13 +20,13 @@ def temp_db():
     """Create a temporary database for testing"""
     temp_dir = tempfile.mkdtemp()
     db_path = os.path.join(temp_dir, "test_housing.db")
-    
+
     # Reset singleton instance
     DatabaseManager._instance = None
-    
+
     db_manager = DatabaseManager(db_path)
     yield db_manager, db_path
-    
+
     # Cleanup
     db_manager.close_connection()
     DatabaseManager._instance = None
@@ -49,32 +51,41 @@ def db_manager_with_token(temp_db):
 @pytest.fixture
 def mock_housing_model(monkeypatch):
     """Mock the HousingModel for testing"""
-    import pandas as pd
     from unittest.mock import MagicMock
-    
+
+    import pandas as pd
+
     model = MagicMock()
     model.expected_features = [
-        'longitude', 'latitude', 'housing_median_age', 'total_rooms',
-        'total_bedrooms', 'population', 'households', 'median_income',
-        'ocean_proximity_<1H OCEAN', 'ocean_proximity_INLAND',
-        'ocean_proximity_ISLAND', 'ocean_proximity_NEAR BAY',
-        'ocean_proximity_NEAR OCEAN'
+        "longitude",
+        "latitude",
+        "housing_median_age",
+        "total_rooms",
+        "total_bedrooms",
+        "population",
+        "households",
+        "median_income",
+        "ocean_proximity_<1H OCEAN",
+        "ocean_proximity_INLAND",
+        "ocean_proximity_ISLAND",
+        "ocean_proximity_NEAR BAY",
+        "ocean_proximity_NEAR OCEAN",
     ]
-    
+
     def mock_predict(df):
         # Return a simple prediction based on median_income
-        return df['median_income'].values * 100000
-    
+        return df["median_income"].values * 100000
+
     model.predict = mock_predict
-    
+
     # Monkeypatch the model loading
     def mock_init(self, model_path="model.joblib"):
         self.model_path = model_path
         self.model = model
         self.expected_features = model.expected_features
-    
+
     monkeypatch.setattr(HousingModel, "__init__", mock_init)
-    
+
     return model
 
 
@@ -84,7 +95,9 @@ def rate_limiter(temp_db):
     db_manager, _ = temp_db
     # Reset singleton instance
     RateLimiter._instance = None
-    rate_limiter = RateLimiter(requests_per_minute=10, window_seconds=60, db_manager=db_manager)
+    rate_limiter = RateLimiter(
+        requests_per_minute=10, window_seconds=60, db_manager=db_manager
+    )
     yield rate_limiter
     RateLimiter._instance = None
 
@@ -92,19 +105,20 @@ def rate_limiter(temp_db):
 @pytest.fixture
 def app_client(mock_housing_model, temp_db):
     """Create a test client for the FastAPI app"""
-    from main import app
     import main
-    
+    from main import app
+
     # Set up test fixtures
     db_manager, _ = temp_db
     main.housing_model = mock_housing_model
     main.db_manager = db_manager
-    
+
     # Initialize rate limiter with test db_manager
     from src.rate_limit import RateLimiter
+
     RateLimiter._instance = None
     RateLimiter(requests_per_minute=100, window_seconds=60, db_manager=db_manager)
-    
+
     client = TestClient(app)
     return client
 
@@ -121,6 +135,5 @@ def sample_housing_input():
         "population": 678.0,
         "households": 249.0,
         "median_income": 5.5789,
-        "ocean_proximity": "NEAR OCEAN"
+        "ocean_proximity": "NEAR OCEAN",
     }
-

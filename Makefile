@@ -1,4 +1,4 @@
-.PHONY: help install install-dev run dev test test-cov test-verbose clean
+.PHONY: help install install-dev run dev test test-cov test-verbose lint format clean
 
 help:
 	@echo "Available commands:"
@@ -9,10 +9,11 @@ help:
 	@echo "  make test         - Run tests"
 	@echo "  make test-cov     - Run tests with coverage report"
 	@echo "  make test-verbose - Run tests in verbose mode"
+	@echo "  make lint         - Run linting checks (flake8, black, isort)"
+	@echo "  make format       - Format code with black and isort"
 	@echo "  make clean        - Clean Python cache files"
 
 install:
-	pip install -r requirements.txt
 	pip install -r requirements-dev.txt
 
 install-prod:
@@ -32,6 +33,16 @@ test-cov:
 
 test-verbose:
 	pytest -v
+
+lint:
+	flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=.venv,venv,__pycache__,.pytest_cache,*.egg-info
+	flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=.venv,venv,__pycache__,.pytest_cache,*.egg-info
+	black --check . --exclude="/(\.venv|venv|__pycache__|\.pytest_cache|.*\.egg-info)/"
+	isort --check-only . --skip-glob=".venv/*" --skip-glob="venv/*" --skip-glob="__pycache__/*" --skip-glob="*.egg-info/*"
+
+format:
+	black . --exclude="/(\.venv|venv|__pycache__|\.pytest_cache|.*\.egg-info)/"
+	isort . --skip-glob=".venv/*" --skip-glob="venv/*" --skip-glob="__pycache__/*" --skip-glob="*.egg-info/*"
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -r {} + 2>/dev/null || true
