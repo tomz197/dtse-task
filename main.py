@@ -54,11 +54,40 @@ async def lifespan(app: FastAPI):
     logger.info("Application shutdown complete")
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    title="DTSE Housing Price Prediction API",
+    description="""
+    REST API for housing price predictions using machine learning models.
+    
+    Features:
+    * Token-based authentication
+    * Rate limiting
+    * Single and batch prediction endpoints
+    * Token management endpoints
+    
+    The API uses a pre-trained machine learning model to predict median house values
+    based on property characteristics such as location, age, rooms, and income.
+    """,
+    version="1.0.0",
+    lifespan=lifespan,
+    tags_metadata=[
+        {
+            "name": "health",
+            "description": "Health check endpoints to verify service availability and status.",
+        },
+        {
+            "name": "predictions",
+            "description": "Housing price prediction endpoints. Requires authentication via Bearer token.",
+        },
+        {
+            "name": "tokens",
+            "description": "API token management endpoints. Requires admin credentials.",
+        },
+    ],
+)
 
 app.add_middleware(RequestLoggingMiddleware)
 
-# Include routers
-app.include_router(health.router)
-app.include_router(predict.router)
-app.include_router(tokens.router)
+app.include_router(health.router, tags=["health"])
+app.include_router(predict.router, tags=["predictions"])
+app.include_router(tokens.router, tags=["tokens"])
