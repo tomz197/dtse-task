@@ -3,7 +3,10 @@ from typing import Dict, Tuple
 from fastapi import HTTPException, status, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from src.database import DatabaseManager
+from src.logging_config import get_logger
 import time
+
+logger = get_logger(__name__)
 
 DEFAULT_REQUESTS_PER_MINUTE = 100
 DEFAULT_WINDOW_SECONDS = 60
@@ -28,6 +31,7 @@ class RateLimiter:
 
             # Dictionary: token -> list of request timestamps
             self.token_requests: Dict[str, list] = defaultdict(list)
+            logger.info(f"RateLimiter initialized: {requests_per_minute} requests per {window_seconds} seconds")
             self._initialized = True
     
     def _cleanup_old_requests(self, token: str):
@@ -45,6 +49,7 @@ class RateLimiter:
         Return remaining tokens and time to reset.
         """
         if not token:
+            logger.warning("Rate limit check called without token")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token is required"
@@ -59,6 +64,9 @@ class RateLimiter:
             remaining_time = self.window_seconds - (time.time() - oldest_request)
             remaining_time = max(0, int(remaining_time))
             
+            logger.warning(
+                f"Rate limit exceeded for token {token[:8]}...: {current_count}/{self.requests_per_minute} requests"
+            )
             return False, 0, remaining_time
         
         self.token_requests[token].append(time.time())
@@ -67,15 +75,22 @@ class RateLimiter:
         remaining_time = self.window_seconds - (time.time() - oldest_request)
         remaining_time = max(0, int(remaining_time))
         
-        return True, self.requests_per_minute - current_count - 1, remaining_time
+        remaining = self.requests_per_minute - current_count - 1
+        logger.debug(
+            f"Rate limit check passed for token {token[:8]}...: {remaining} requests remaining"
+        )
+        
+        return True, remaining, remaining_time
     
     def reset_token_limit(self, token: str):
+        logger.info(f"Resetting rate limit for token {token[:8]}...")
         self.token_requests[token] = []
 
     def check_rate_limit_dependency(self, credentials: HTTPAuthorizationCredentials = Security(HTTPBearer())) -> str:
         token = credentials.credentials
         
         if self._db_manager and not self._db_manager.validate_api_token(token):
+            logger.warning(f"Invalid or expired token: {token[:8]}...")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired token"
@@ -84,6 +99,10 @@ class RateLimiter:
         is_allowed, remaining_tokens, remaining_time = self.check_rate_limit(token)
         
         if not is_allowed:
+            logger.warning(
+                f"Rate limit exceeded for token {token[:8]}...: "
+                f"{self.requests_per_minute} req/min, retry after {remaining_time}s"
+            )
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail=f"Rate limit exceeded. Limit: {self.requests_per_minute} requests per minute. Retry after {remaining_time} seconds.",
