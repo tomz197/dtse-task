@@ -3,11 +3,13 @@ from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from src.database import DatabaseManager
 from src.endpoints import health, predict, tokens
 from src.logging_config import get_logger, setup_logging
-from src.middleware import RequestLoggingMiddleware
+from src.middleware import RequestLoggingMiddleware, RequestSizeLimitMiddleware
 from src.model import MODEL_NAME, HousingModel
 from src.rate_limit import RateLimiter
 
@@ -40,7 +42,12 @@ async def lifespan(app: FastAPI):
         logger.info("Database manager initialized")
 
         logger.info("Initializing rate limiter")
-        RateLimiter(db_manager=config.db_manager)
+        requests_per_minute = int(os.getenv("RATE_LIMIT_REQUESTS_PER_MINUTE", "100"))
+        RateLimiter(
+            requests_per_minute=requests_per_minute,
+            db_manager=config.db_manager
+        )
+        logger.info(f"Rate limiter initialized with {requests_per_minute} requests per minute")
         logger.info("Application startup complete")
     except Exception as e:
         logger.error(f"Error during application startup: {e}", exc_info=True)
@@ -86,7 +93,26 @@ app = FastAPI(
     ],
 )
 
+cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+trusted_hosts = os.getenv("TRUSTED_HOSTS", None)
+if trusted_hosts:
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=trusted_hosts.split(",")
+    )
+
 app.add_middleware(RequestLoggingMiddleware)
+
+max_request_size_mb = int(os.getenv("MAX_REQUEST_SIZE_MB", "10"))
+app.add_middleware(RequestSizeLimitMiddleware, max_request_size_mb=max_request_size_mb)
 
 app.include_router(health.router, tags=["health"])
 app.include_router(predict.router, tags=["predictions"])
